@@ -16,13 +16,14 @@ build-type:         Simple
 -- extra-source-files:
 
 common warnings
-    ghc-options: -Wall
+    ghc-options: -Wall -ddump-splices
 
 library
     import:           warnings
     exposed-modules: Data.SerDoc.Class
                    , Data.SerDoc.Info
                    , Data.SerDoc.TestUtil
+                   , Data.SerDoc.TH
     build-depends: base ^>=4.17.0.0
                  , bytestring >=0.12.0.2 && <0.13
                  , containers >=0.6 && <0.8

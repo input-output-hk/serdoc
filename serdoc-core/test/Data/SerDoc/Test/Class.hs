@@ -5,6 +5,9 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 module Data.SerDoc.Test.Class
 where
@@ -13,15 +16,13 @@ import Test.Tasty
 import Test.Tasty.QuickCheck
 import Data.Proxy
 import Control.Monad.Identity
-import Text.Read
 import Control.Monad.Except
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
-import qualified Data.Text as Text
-import Data.Text.Encoding (encodeUtf8, decodeUtf8)
 
 import Data.SerDoc.Class
 import Data.SerDoc.Info
+import Data.SerDoc.TH
 import Data.SerDoc.TestUtil
 
 data ShowCodec
@@ -35,13 +36,37 @@ instance Codec ShowCodec where
 instance HasInfo ShowCodec () where
   info _ _ = basicField "()" (FixedSize $ BS.length $ showBS ())
 
-instance (Show a, Read a) => Serializable ShowCodec a where
-  encode _ _ = return . showBS
+instance HasInfo ShowCodec Int where
+  info _ _ = basicField "Int" (RangeSize (FixedSize 1) (FixedSize $ length $ show (minBound :: Int)))
+
+data Record =
+  Record
+    { firstField :: ()
+    , secondField :: Int
+    }
+    deriving (Show, Read, Eq, Ord)
+
+instance Arbitrary Record where
+  arbitrary = Record <$> arbitrary <*> arbitrary
+  shrink (Record a b) =
+    Record a <$> shrink b
+
+$(deriveHasInfo ''ShowCodec ''Record)
+$(deriveSerializable ''ShowCodec ''Record)
+
+newtype ViaShow a = ViaShow { viaShow :: a }
+
+instance (Show a, Read a) => Serializable ShowCodec (ViaShow a) where
+  encode _ _ = return . showBS . viaShow
   decodeM _ _ str = do
     let decodedMay = readMaybeBS str
     case decodedMay of
       Nothing -> throwError "Read: no parse"
-      Just x -> return x
+      Just (x, rest) -> return (ViaShow x, rest)
+
+deriving via (ViaShow ()) instance Serializable ShowCodec ()
+
+deriving via (ViaShow Int) instance Serializable ShowCodec Int
 
 tests :: TestTree
 tests = testGroup "Class"
@@ -51,6 +76,8 @@ tests = testGroup "Class"
                   ]
               , testGroup "Serializable"
                   [ testProperty "()" $ pRoundTrip @() (Proxy @ShowCodec)
+                  , testProperty "Int" $ pRoundTrip @Int (Proxy @ShowCodec)
+                  , testProperty "Record" $ pRoundTrip @Record (Proxy @ShowCodec)
                   ]
               ]
           ]

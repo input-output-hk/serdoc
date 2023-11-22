@@ -125,7 +125,7 @@ pRoundTrip expected =
         property False
   where
     encoded = runPut $ encode (Proxy @BinaryCodec) () expected
-    getResult = runGetOrFail (decodeM (Proxy @BinaryCodec) () ()) encoded
+    getResult = runGetOrFail (fst <$> decodeM (Proxy @BinaryCodec) () ()) encoded
 
 pEncodedSizeMatches :: forall a.
                        ( Serializable BinaryCodec a

@@ -29,6 +29,7 @@ import Data.Kind
 import Data.Typeable
 import Control.Monad.Except
 import Control.Monad.Identity
+import Data.Bifunctor
 
 -- * Typeclasses
 
@@ -63,24 +64,24 @@ class Codec codec where
 class Codec codec => Serializable codec a where
   -- | Encode / serialize a value.
   encode :: Proxy codec -> Context codec -> a -> MonadEncode codec (Encoded codec)
-  -- | Decode / deserialize a value. Decoding errors are signalled through
-  -- 'ExceptT'.
-  decodeM :: Proxy codec -> Context codec -> Encoded codec -> (MonadDecode codec) a
+  -- | Decode / deserialize a value. Decoding errors can be signalled through
+  -- the codec's 'MonadDecode' type.
+  decodeM :: Proxy codec -> Context codec -> Encoded codec -> MonadDecode codec (a, Encoded codec)
 
 decode :: (Serializable codec a, MonadDecode codec ~ Identity)
        => Proxy codec
        -> Context codec
        -> Encoded codec
        -> a
-decode codec ctx enc = runIdentity $ decodeM codec ctx enc
+decode codec ctx enc = fst . runIdentity $ decodeM codec ctx enc
 
-decodeMEither :: (Serializable codec a, MonadDecode codec ~ ExceptT err m)
+decodeMEither :: (Serializable codec a, Functor m, MonadDecode codec ~ ExceptT err m)
               => Proxy codec
               -> Context codec
               -> Encoded codec
               -> m (Either err a)
 decodeMEither p c e =
-  runExceptT $ decodeM p c e
+  runExceptT $ fst <$> decodeM p c e
 
 decodeEither :: (Serializable codec a, MonadDecode codec ~ Except err)
              => Proxy codec
@@ -88,7 +89,7 @@ decodeEither :: (Serializable codec a, MonadDecode codec ~ Except err)
              -> Encoded codec
              -> Either err a
 decodeEither p c e =
-  runExcept $ decodeM p c e
+  fmap fst $ runExcept $ decodeM p c e
 
 -- | Serialization metadata for a 'Codec'.
 class Codec codec => HasInfo codec a where
@@ -123,7 +124,7 @@ instance ( Enum a
          ) => Serializable codec (ViaEnum a)
   where
     encode pCodec context (ViaEnum x) = encodeEnum pCodec (Proxy @(DefEnumEncoding codec)) context x
-    decodeM pCodec context encoded = ViaEnum <$> decodeEnumM pCodec (Proxy @(DefEnumEncoding codec)) context encoded
+    decodeM pCodec context encoded = first ViaEnum <$> decodeEnumM pCodec (Proxy @(DefEnumEncoding codec)) context encoded
 
 enumInfo :: forall codec a n.
             ( Typeable a
@@ -140,7 +141,7 @@ enumInfo :: forall codec a n.
          -> FieldInfo codec
 enumInfo pCodec _ pN =
     enumField
-      (typeName $ Proxy @a)
+      (getTypeName $ Proxy @a)
       (fieldSize $ info pCodec pN)
       [ (fromEnum val, show val) | val <- [minBound .. maxBound :: a] ]
 
@@ -172,13 +173,13 @@ decodeEnumM :: forall codec n a.
             -> Proxy n
             -> Context codec
             -> Encoded codec
-            -> (MonadDecode codec) a
+            -> (MonadDecode codec) (a, Encoded codec)
 decodeEnumM pCodec _ context enc = do
-  (i :: n) <- decodeM pCodec context enc
-  return $ toEnum . fromIntegral $ i
+  (i :: n, rest) <- decodeM pCodec context enc
+  return (toEnum . fromIntegral $ i, rest)
 
-typeName :: Typeable a => Proxy a -> String
-typeName = tyConName . typeRepTyCon . typeRep
+getTypeName :: Typeable a => Proxy a -> String
+getTypeName = tyConName . typeRepTyCon . typeRep
 
 
 -- * Helpers For Dealing With 'FieldInfo' And 'Field Size'
