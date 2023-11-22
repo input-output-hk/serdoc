@@ -23,21 +23,36 @@ import Language.Haskell.TH.Syntax (Lift)
 
 -- * Documentation annotation types
 
+-- | Used to add descriptions via @ANN@ pragmas. This is necessary because
+-- Template Haskell cannot find Haddock comments attached to constructors inside
+-- associated types, but it can find annotations on those same constructors.
 newtype Description = Description { descriptionParagraphs :: [String] }
   deriving newtype (Show, Read, Eq, Semigroup, Monoid)
   deriving (Data, Typeable, Lift)
 
 -- * 'FieldInfo' and related types
 
+-- | Describes the serialization format of a field.
 data FieldInfo codec
   = AnnField !String !(FieldInfo codec)
+    -- ^ Adds an annotation to a field.
   | BasicField !BasicFieldInfo
+    -- ^ A simple field, with a named type and a size.
   | EnumField !EnumFieldInfo
+    -- ^ An enum field, which reports labels and values for the possible values.
   | CompoundField !(CompoundFieldInfo codec)
+    -- ^ A field that is composed out of multiple sub-fields, encoded
+    -- sequentially.
   | ChoiceField !(ChoiceFieldInfo codec)
+    -- ^ A list of alternatives, to be picked based on a given choice condition.
   | ListField !(ListFieldInfo codec)
+    -- ^ A list of values, encoded sequentially. The length must be encoded
+    -- separately, and can be referenced from a length expression.
   | AliasField !(AliasFieldInfo codec)
+    -- ^ Adds an alternative name (alias) to a field type.
   | SumField !(SumFieldInfo codec)
+    -- ^ A list of named alternatives. TODO: this is probably redundant and may
+    -- not actually work.
   deriving (Show, Eq)
 
 data BasicFieldInfo =

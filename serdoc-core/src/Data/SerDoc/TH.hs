@@ -50,6 +50,12 @@ strippedFieldName tyName fieldName =
     else
       fieldStr
 
+-- | Derive a 'HasInfo' instance for the given codec and type.
+-- Currently only supports record types.
+-- A matching 'Serializable' instance must serialize record fields in the order
+-- they are declared in the source code, without any additional separators,
+-- padding, or envelope around or between them. If your serializer does not meet
+-- these requirements, you must write a custom 'HasInfo' instance instead.
 deriveHasInfo :: Name -> Name -> DecsQ
 deriveHasInfo codecName typeName = do
   reify typeName >>= \case
@@ -68,11 +74,17 @@ deriveHasInfo codecName typeName = do
                   )
         |]
     x ->
-      error . show $ x
+      error $ "Unsupported data type " ++ show typeName ++ ": " ++ show x
 
 (<<>>) :: (Applicative m, Monoid a) => m a -> m a -> m a
 a <<>> b = (<>) <$> a <*> b
 
+-- | Derive a 'Serializable' instance for the given codec and type.
+-- Currently only supports record types.
+-- The generated instance will serialize record fields in the order
+-- they are declared in the source code, without any additional separators,
+-- padding, or envelope around or between them, making it compatible with
+-- 'deriveHasInfo'. (See also 'deriveSerDoc'.)
 deriveSerializable :: Name -> Name -> DecsQ
 deriveSerializable codecName typeName = do
   reify typeName >>= \case
@@ -98,6 +110,8 @@ deriveSerializable codecName typeName = do
     x ->
       error . show $ x
 
+-- | Derive both a 'HasInfo' instance and a matching 'Serializable' instance,
+-- combining 'deriveHasInfo' and 'deriveSerializable'.
 deriveSerDoc :: Name -> Name -> DecsQ
 deriveSerDoc codecName typeName =
   (++) <$> deriveHasInfo codecName typeName

@@ -4,6 +4,8 @@
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE DerivingVia #-}
 
 module Data.SerDoc.Binary.Codec
 where
@@ -21,6 +23,7 @@ import Data.List
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy as LBS
 import Data.ByteString.Short (ShortByteString)
+import Data.Bifunctor
 
 data BinaryCodec
 
@@ -30,54 +33,86 @@ instance Codec BinaryCodec where
   type MonadEncode BinaryCodec = B.PutM
   type MonadDecode BinaryCodec = B.Get
 
-instance B.Binary a => Serializable BinaryCodec a where
-  encode _ () = B.put
-  decodeM _ _ () = B.get
+newtype ViaBinary a = ViaBinary { viaBinary :: a }
+
+instance B.Binary a => Serializable BinaryCodec (ViaBinary a) where
+  encode _ () = B.put . viaBinary
+  decodeM _ _ () = first ViaBinary <$> B.get
 
 instance HasInfo BinaryCodec () where
   info _ _ = basicField "()" (FixedSize 0)
 
+deriving via (ViaBinary ()) instance Serializable BinaryCodec ()
+
 instance HasInfo BinaryCodec Bool where
   info codec p = enumInfo codec p (Proxy @Word8)
+
+deriving via (ViaBinary Bool) instance Serializable BinaryCodec Bool
 
 instance HasInfo BinaryCodec Ordering where
   info codec p = enumInfo codec p (Proxy @Word8)
 
+deriving via (ViaBinary Ordering) instance Serializable BinaryCodec Ordering
+
 instance HasInfo BinaryCodec Word8 where
   info _ _ = basicField "Word8" (FixedSize 1)
+
+deriving via (ViaBinary Word8) instance Serializable BinaryCodec Word8
 
 instance HasInfo BinaryCodec Word16 where
   info _ _ = basicField "Word16BE" (FixedSize 2)
 
+deriving via (ViaBinary Word16) instance Serializable BinaryCodec Word16
+
 instance HasInfo BinaryCodec Word32 where
   info _ _ = basicField "Word32BE" (FixedSize 4)
+
+deriving via (ViaBinary Word32) instance Serializable BinaryCodec Word32
 
 instance HasInfo BinaryCodec Word64 where
   info _ _ = basicField "Word64BE" (FixedSize 8)
 
+deriving via (ViaBinary Word64) instance Serializable BinaryCodec Word64
+
 instance HasInfo BinaryCodec Word where
   info _ _ = basicField "Word64BE" (FixedSize 8)
+
+deriving via (ViaBinary Word) instance Serializable BinaryCodec Word
 
 instance HasInfo BinaryCodec Int8 where
   info _ _ = basicField "Int8" (FixedSize 1)
 
+deriving via (ViaBinary Int8) instance Serializable BinaryCodec Int8
+
 instance HasInfo BinaryCodec Int16 where
   info _ _ = basicField "Int16BE" (FixedSize 2)
+
+deriving via (ViaBinary Int16) instance Serializable BinaryCodec Int16
 
 instance HasInfo BinaryCodec Int32 where
   info _ _ = basicField "Int32BE" (FixedSize 4)
 
+deriving via (ViaBinary Int32) instance Serializable BinaryCodec Int32
+
 instance HasInfo BinaryCodec Int64 where
   info _ _ = basicField "Int64BE" (FixedSize 8)
+
+deriving via (ViaBinary Int64) instance Serializable BinaryCodec Int64
 
 instance HasInfo BinaryCodec Int where
   info _ _ = basicField "Int64BE" (FixedSize 8)
 
+deriving via (ViaBinary Int) instance Serializable BinaryCodec Int
+
 instance HasInfo BinaryCodec Float where
   info _ _ = basicField "Float" UnknownSize
 
+deriving via (ViaBinary Float) instance Serializable BinaryCodec Float
+
 instance HasInfo BinaryCodec Double where
   info _ _ = basicField "Double" UnknownSize
+
+deriving via (ViaBinary Double) instance Serializable BinaryCodec Double
 
 instance HasInfo BinaryCodec Integer where
   info codec _ =
@@ -95,6 +130,8 @@ instance HasInfo BinaryCodec Integer where
         )
       ]
 
+deriving via (ViaBinary Integer) instance Serializable BinaryCodec Integer
+
 instance HasInfo BinaryCodec Natural where
   info codec _ =
     compoundField "Natural"
@@ -108,12 +145,15 @@ instance HasInfo BinaryCodec Natural where
         )
       ]
 
+deriving via (ViaBinary Natural) instance Serializable BinaryCodec Natural
+
 instance HasInfo BinaryCodec a => HasInfo BinaryCodec [a] where
   info codec (_ :: Proxy [a]) =
     compoundField "List"
       [ ("length", info codec (Proxy :: Proxy Int))
       , ("items", listField (VarSize "length") (info codec (Proxy :: Proxy a)))
       ]
+deriving via (ViaBinary [a]) instance B.Binary a => Serializable BinaryCodec [a]
 
 instance HasInfo BinaryCodec a => HasInfo BinaryCodec (Maybe a) where
   info codec (_ :: Proxy (Maybe a)) =
@@ -127,6 +167,7 @@ instance HasInfo BinaryCodec a => HasInfo BinaryCodec (Maybe a) where
               ]
         )
       ]
+deriving via (ViaBinary (Maybe a)) instance B.Binary a => Serializable BinaryCodec (Maybe a)
 
 instance (HasInfo BinaryCodec a, HasInfo BinaryCodec b)
          => HasInfo BinaryCodec (Either a b)
@@ -143,6 +184,9 @@ instance (HasInfo BinaryCodec a, HasInfo BinaryCodec b)
         )
       ]
 
+deriving via (ViaBinary (Either a b)) instance (B.Binary a, B.Binary b)
+         => Serializable BinaryCodec (Either a b)
+
 tupleInfo :: [FieldInfo codec] -> FieldInfo codec
 tupleInfo fieldInfos =
   compoundField combinedName subfieldInfos
@@ -152,6 +196,114 @@ tupleInfo fieldInfos =
       [ ("elem" <> show (n :: Int), fi)
       | (n, fi) <- zip [0,1..] fieldInfos
       ]
+
+deriving via (ViaBinary (a, b))
+  instance
+    ( B.Binary a
+    , B.Binary b
+    )
+    =>
+    Serializable BinaryCodec (a, b)
+
+deriving via (ViaBinary (a, b, c))
+  instance
+    ( B.Binary a
+    , B.Binary b
+    , B.Binary c
+    )
+    =>
+    Serializable BinaryCodec (a, b, c)
+
+deriving via (ViaBinary (a, b, c, d))
+  instance
+    ( B.Binary a
+    , B.Binary b
+    , B.Binary c
+    , B.Binary d
+    )
+    =>
+    Serializable BinaryCodec (a, b, c, d)
+
+deriving via (ViaBinary (a, b, c, d, e))
+  instance
+    ( B.Binary a
+    , B.Binary b
+    , B.Binary c
+    , B.Binary d
+    , B.Binary e
+    )
+    =>
+    Serializable BinaryCodec (a, b, c, d, e)
+
+deriving via (ViaBinary (a, b, c, d, e, f))
+  instance
+    ( B.Binary a
+    , B.Binary b
+    , B.Binary c
+    , B.Binary d
+    , B.Binary e
+    , B.Binary f
+    )
+    =>
+    Serializable BinaryCodec (a, b, c, d, e, f)
+
+deriving via (ViaBinary (a, b, c, d, e, f, g))
+  instance
+    ( B.Binary a
+    , B.Binary b
+    , B.Binary c
+    , B.Binary d
+    , B.Binary e
+    , B.Binary f
+    , B.Binary g
+    )
+    =>
+    Serializable BinaryCodec (a, b, c, d, e, f, g)
+
+deriving via (ViaBinary (a, b, c, d, e, f, g, h))
+  instance
+    ( B.Binary a
+    , B.Binary b
+    , B.Binary c
+    , B.Binary d
+    , B.Binary e
+    , B.Binary f
+    , B.Binary g
+    , B.Binary h
+    )
+    =>
+    Serializable BinaryCodec (a, b, c, d, e, f, g, h)
+
+deriving via (ViaBinary (a, b, c, d, e, f, g, h, i))
+  instance
+    ( B.Binary a
+    , B.Binary b
+    , B.Binary c
+    , B.Binary d
+    , B.Binary e
+    , B.Binary f
+    , B.Binary g
+    , B.Binary h
+    , B.Binary i
+    )
+    =>
+    Serializable BinaryCodec (a, b, c, d, e, f, g, h, i)
+
+deriving via (ViaBinary (a, b, c, d, e, f, g, h, i, j))
+  instance
+    ( B.Binary a
+    , B.Binary b
+    , B.Binary c
+    , B.Binary d
+    , B.Binary e
+    , B.Binary f
+    , B.Binary g
+    , B.Binary h
+    , B.Binary i
+    , B.Binary j
+    )
+    =>
+    Serializable BinaryCodec (a, b, c, d, e, f, g, h, i, j)
 
 instance ( HasInfo BinaryCodec a
          , HasInfo BinaryCodec b
@@ -331,6 +483,7 @@ instance HasInfo BinaryCodec ByteString where
       [ ("length", info codec (Proxy :: Proxy Int))
       , ("items", listField (VarSize "length") (info codec (Proxy :: Proxy Word8)))
       ]
+deriving via (ViaBinary ByteString) instance Serializable BinaryCodec ByteString
 
 instance HasInfo BinaryCodec LBS.ByteString where
   info codec _ =
@@ -338,6 +491,7 @@ instance HasInfo BinaryCodec LBS.ByteString where
       [ ("length", info codec (Proxy :: Proxy Int))
       , ("items", listField (VarSize "length") (info codec (Proxy :: Proxy Word8)))
       ]
+deriving via (ViaBinary LBS.ByteString) instance Serializable BinaryCodec LBS.ByteString
 
 instance HasInfo BinaryCodec ShortByteString where
   info codec _ =
@@ -345,3 +499,4 @@ instance HasInfo BinaryCodec ShortByteString where
       [ ("length", info codec (Proxy :: Proxy Int))
       , ("items", listField (VarSize "length") (info codec (Proxy :: Proxy Word8)))
       ]
+deriving via (ViaBinary ShortByteString) instance Serializable BinaryCodec ShortByteString

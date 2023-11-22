@@ -20,7 +20,6 @@ library
     import:           warnings
     exposed-modules: Data.SerDoc.Binary
                    , Data.SerDoc.Binary.Codec
-                   , Data.SerDoc.Binary.TH
     -- other-modules:
     -- other-extensions:
     build-depends: base ^>=4.17.0.0

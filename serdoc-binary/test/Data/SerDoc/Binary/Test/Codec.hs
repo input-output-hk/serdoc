@@ -6,6 +6,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Data.SerDoc.Binary.Test.Codec
 where
@@ -16,14 +17,48 @@ import Data.Proxy
 
 import Data.SerDoc.Class
 import Data.SerDoc.Info
+import Data.SerDoc.TH
 import Data.SerDoc.Binary.Codec
+
+import Data.Binary (Binary (..))
 import Data.Binary.Get (runGetOrFail)
 import Data.Binary.Put (runPut)
 import Data.Typeable
 import Data.Int
 import Data.Word
 import Numeric.Natural
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as LBS
+import qualified Data.ByteString.Short as SBS
+
+shrinkBS :: ByteString -> [ByteString]
+shrinkBS = fmap BS.pack . shrink . BS.unpack
+
+data TestRecord =
+  TestRecord
+    { firstField :: Int
+    , secondField :: ByteString
+    , thirdField :: ()
+    }
+    deriving (Show, Eq)
+
+instance Arbitrary TestRecord where
+  arbitrary =
+    TestRecord
+      <$> arbitrary
+      <*> (BS.pack <$> arbitrary)
+      <*> arbitrary
+  shrink (TestRecord f1 f2 f3) =
+    (TestRecord f1 <$> shrinkBS f2 <*> pure f3)
+    ++
+    (TestRecord <$> shrink f1 <*> pure f2 <*> pure f3)
+
+instance Binary TestRecord where
+  get = TestRecord <$> get <*> get <*> get
+  put (TestRecord f1 f2 f3) = put (f1, f2, f3)
+
+$(deriveSerDoc ''BinaryCodec ''TestRecord)
 
 tests :: TestTree
 tests = testGroup "BinaryCodec"
@@ -44,6 +79,9 @@ tests = testGroup "BinaryCodec"
               , testSerializable (Proxy @Float)
               , testSerializable (Proxy @Double)
               , testSerializable (Proxy @Ordering)
+              , testSerializableWith BS.pack Proxy
+              , testSerializableWith LBS.pack Proxy
+              , testSerializableWith SBS.pack Proxy
               , testSerializable (Proxy @[Word8])
               , testSerializable (Proxy @[Double])
               , testSerializable (Proxy @(Maybe Word8))
@@ -58,6 +96,7 @@ tests = testGroup "BinaryCodec"
               , testSerializable (Proxy @(Word8, Word16, Word16, Word16, Word16, Word16, Word32, Word64))
               , testSerializable (Proxy @(Word8, Word16, Word16, Word16, Word16, Word16, Word16, Word32, Word64))
               , testSerializable (Proxy @(Word8, Word16, Word16, Word16, Word16, Word16, Word16, Word16, Word32, Word64))
+              , testSerializable (Proxy @TestRecord)
               ]
           ]
 
@@ -68,6 +107,7 @@ testSerializable :: forall a.
                     , Eq a
                     , Serializable BinaryCodec a
                     , HasInfo BinaryCodec a
+                    , Binary a
                     )
                  => Proxy a
                  -> TestTree
@@ -82,6 +122,7 @@ testSerializableWith :: forall a b.
                     , Eq b
                     , Serializable BinaryCodec b
                     , HasInfo BinaryCodec b
+                    , Binary b
                     )
                  => (a -> b)
                  -> Proxy b
@@ -90,6 +131,7 @@ testSerializableWith make proxy =
   testGroup (show . typeRep $ proxy)
     [ testProperty "Round trip" $ pRoundTrip . make
     , testProperty "Encoded size matches" $ pEncodedSizeMatches . make
+    , testProperty "Binary matches codec" $ pBinaryMatchesCodec . make
     ]
 
 pUnitHasInfo :: (Codec codec, HasInfo codec ())
@@ -126,6 +168,20 @@ pRoundTrip expected =
   where
     encoded = runPut $ encode (Proxy @BinaryCodec) () expected
     getResult = runGetOrFail (fst <$> decodeM (Proxy @BinaryCodec) () ()) encoded
+
+pBinaryMatchesCodec :: forall a.
+                       ( Serializable BinaryCodec a
+                       , Binary a
+                       , Eq a
+                       , Show a
+                       )
+                    => a
+                    -> Property
+pBinaryMatchesCodec value =
+  encoded === encodedBinary
+  where
+    encoded = runPut $ encode (Proxy @BinaryCodec) () value
+    encodedBinary = runPut $ put value
 
 pEncodedSizeMatches :: forall a.
                        ( Serializable BinaryCodec a
