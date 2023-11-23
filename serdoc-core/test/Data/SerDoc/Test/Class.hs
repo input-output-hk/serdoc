@@ -8,6 +8,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Data.SerDoc.Test.Class
 where
@@ -39,21 +40,6 @@ instance HasInfo ShowCodec () where
 instance HasInfo ShowCodec Int where
   info _ _ = basicField "Int" (RangeSize (FixedSize 1) (FixedSize $ length $ show (minBound :: Int)))
 
-data Record =
-  Record
-    { firstField :: ()
-    , secondField :: Int
-    }
-    deriving (Show, Read, Eq, Ord)
-
-instance Arbitrary Record where
-  arbitrary = Record <$> arbitrary <*> arbitrary
-  shrink (Record a b) =
-    Record a <$> shrink b
-
-$(deriveHasInfo ''ShowCodec ''Record)
-$(deriveSerializable ''ShowCodec ''Record)
-
 newtype ViaShow a = ViaShow { viaShow :: a }
 
 instance (Show a, Read a) => Serializable ShowCodec (ViaShow a) where
@@ -67,6 +53,37 @@ instance (Show a, Read a) => Serializable ShowCodec (ViaShow a) where
 deriving via (ViaShow ()) instance Serializable ShowCodec ()
 
 deriving via (ViaShow Int) instance Serializable ShowCodec Int
+
+
+data Record =
+  Record
+    { firstField :: ()
+    , secondField :: Int
+    }
+    deriving (Show, Read, Eq, Ord)
+
+instance Arbitrary Record where
+  arbitrary = Record <$> arbitrary <*> arbitrary
+  shrink (Record a b) =
+    Record a <$> shrink b
+
+$(deriveSerDoc ''ShowCodec [] ''Record)
+
+data Record1 a =
+  Record1
+    { firstField1 :: a
+    , secondField1 :: [a]
+    }
+    deriving (Show, Read, Eq, Ord)
+
+instance Arbitrary a => Arbitrary (Record1 a) where
+  arbitrary = Record1 <$> arbitrary <*> arbitrary
+  shrink (Record1 a b) =
+    (Record1 a <$> shrink b)
+    ++
+    (Record1 <$> shrink a <*> pure b)
+
+$(deriveSerDoc ''ShowCodec [] ''Record1)
 
 tests :: TestTree
 tests = testGroup "Class"

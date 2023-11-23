@@ -58,7 +58,7 @@ instance Binary TestRecord where
   get = TestRecord <$> get <*> get <*> get
   put (TestRecord f1 f2 f3) = put (f1, f2, f3)
 
-$(deriveSerDoc ''BinaryCodec ''TestRecord)
+$(deriveSerDoc ''BinaryCodec [] ''TestRecord)
 
 tests :: TestTree
 tests = testGroup "BinaryCodec"
