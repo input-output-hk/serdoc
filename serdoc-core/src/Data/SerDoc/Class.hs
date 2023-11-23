@@ -64,32 +64,75 @@ class Codec codec where
 class Codec codec => Serializable codec a where
   -- | Encode / serialize a value.
   encode :: Proxy codec -> Context codec -> a -> MonadEncode codec (Encoded codec)
-  -- | Decode / deserialize a value. Decoding errors can be signalled through
-  -- the codec's 'MonadDecode' type.
+  -- | Decode / deserialize a value. Returns the decoded value, and any
+  -- remaining unconsumed input. Decoding errors can be signalled through the
+  -- codec's 'MonadDecode' type.
+  -- This is the most general decoding function; for some codecs, you may want
+  -- to use 'decode', 'decodeEither', or 'decodeMEither' instead.
   decodeM :: Proxy codec -> Context codec -> Encoded codec -> MonadDecode codec (a, Encoded codec)
 
+-- | Decode / deserialize a value, discarding unconsumed input.
+decodeM_ :: (Serializable codec a, Functor (MonadDecode codec))
+         => Proxy codec
+         -> Context codec
+         -> Encoded codec
+         -> MonadDecode codec a
+decodeM_ codec ctx = fmap fst . decodeM codec ctx
+
+-- | Decode in a pure codec without error handling facilities.
 decode :: (Serializable codec a, MonadDecode codec ~ Identity)
        => Proxy codec
        -> Context codec
        -> Encoded codec
-       -> a
-decode codec ctx enc = fst . runIdentity $ decodeM codec ctx enc
+       -> (a, Encoded codec)
+decode codec ctx enc = runIdentity $ decodeM codec ctx enc
 
+-- | Decode in a pure codec without error handling facilities, discarding
+-- unconsumed input.
+decode_ :: (Serializable codec a, MonadDecode codec ~ Identity)
+       => Proxy codec
+       -> Context codec
+       -> Encoded codec
+       -> a
+decode_ codec ctx enc = runIdentity $ decodeM_ codec ctx enc
+
+-- | Decode in a codec that uses 'ExceptT' for signalling decoding errors.
 decodeMEither :: (Serializable codec a, Functor m, MonadDecode codec ~ ExceptT err m)
               => Proxy codec
               -> Context codec
               -> Encoded codec
-              -> m (Either err a)
+              -> m (Either err (a, Encoded codec))
 decodeMEither p c e =
-  runExceptT $ fst <$> decodeM p c e
+  runExceptT $ decodeM p c e
 
+-- | Decode in a codec that uses 'ExceptT' for signalling decoding errors,
+-- discarding unconsumed input.
+decodeMEither_ :: (Serializable codec a, Functor m, MonadDecode codec ~ ExceptT err m)
+              => Proxy codec
+              -> Context codec
+              -> Encoded codec
+              -> m (Either err a)
+decodeMEither_ p c e =
+  runExceptT $ decodeM_ p c e
+
+-- | Decode in a pure codec with error signalling using 'Except'.
 decodeEither :: (Serializable codec a, MonadDecode codec ~ Except err)
              => Proxy codec
              -> Context codec
              -> Encoded codec
-             -> Either err a
+             -> Either err (a, Encoded codec)
 decodeEither p c e =
-  fmap fst $ runExcept $ decodeM p c e
+  runExcept $ decodeM p c e
+
+-- | Decode in a pure codec with error signalling using 'Except', discarding
+-- unconsumed input.
+decodeEither_ :: (Serializable codec a, MonadDecode codec ~ Except err)
+             => Proxy codec
+             -> Context codec
+             -> Encoded codec
+             -> Either err a
+decodeEither_ p c e =
+  runExcept $ decodeM_ p c e
 
 -- | Serialization metadata for a 'Codec'.
 class Codec codec => HasInfo codec a where

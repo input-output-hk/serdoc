@@ -99,6 +99,9 @@ pRoundTrip :: forall a codec err.
               , Show a
               , MonadEncode codec ~ Identity
               , MonadDecode codec ~ Except err
+              , Eq (Encoded codec)
+              , Show (Encoded codec)
+              , Monoid (Encoded codec)
               , Context codec ~ ()
               , Eq err
               , Show err
@@ -107,7 +110,7 @@ pRoundTrip :: forall a codec err.
            -> a
            -> Property
 pRoundTrip pCodec expected =
-  actual === Right expected
+  actual === Right (expected, mempty)
   where
     encoded = runIdentity $ encode pCodec () expected
     actual = decodeEither pCodec () encoded
