@@ -25,7 +25,7 @@ library
     build-depends: base ^>=4.17.0.0
                  , serdoc-core ^>=0.1.0.0
                  , binary >=0.8.0.0 && <0.11
-                 , bytestring >=0.12 && <0.13
+                 , bytestring >=0.11 && <0.13
     hs-source-dirs:   src
     default-language: Haskell2010
 
@@ -40,7 +40,7 @@ test-suite serdoc-binary-test
                  , serdoc-binary
                  , serdoc-core ^>=0.1.0.0
                  , binary >=0.8.0.0 && <0.11
-                 , bytestring >=0.12.0.2 && <0.13
+                 , bytestring >=0.11 && <0.13
                  , mtl >=2.3.1 && <2.4
                  , tasty >=1.5 && <1.6
                  , tasty-quickcheck >=0.10.3 && <0.11
