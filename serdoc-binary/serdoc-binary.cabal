@@ -22,7 +22,7 @@ library
                    , Data.SerDoc.Binary.Codec
     -- other-modules:
     -- other-extensions:
-    build-depends: base ^>=4.17.0.0
+    build-depends: base ^>=4.16.0.0
                  , serdoc-core ^>=0.1.0.0
                  , binary >=0.8.0.0 && <0.11
                  , bytestring >=0.11 && <0.13
@@ -36,7 +36,7 @@ test-suite serdoc-binary-test
     hs-source-dirs:   test
     main-is: Main.hs
     other-modules: Data.SerDoc.Binary.Test.Codec
-    build-depends: base ^>=4.17.0.0
+    build-depends: base ^>=4.16.0.0
                  , serdoc-binary
                  , serdoc-core ^>=0.1.0.0
                  , binary >=0.8.0.0 && <0.11
