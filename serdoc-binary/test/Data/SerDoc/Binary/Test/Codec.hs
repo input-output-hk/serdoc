@@ -156,6 +156,7 @@ pRoundTrip expected =
       counterexample ("Error: " ++ err) $
       counterexample ("Unconsumed input: " ++ show unconsumed) $
       counterexample ("Consumed bytes: " ++ show consumed) $
+      counterexample ("Encoded: " ++ show encoded) $
         property False
     Right ("", _size, actual) ->
       expected === actual
@@ -164,6 +165,7 @@ pRoundTrip expected =
       counterexample ("Unconsumed input: " ++ show unconsumed) $
       counterexample ("Consumed bytes: " ++ show consumed) $
       counterexample ("Parsed value: " ++ show actual) $
+      counterexample ("Encoded: " ++ show encoded) $
         property False
   where
     encoded = runPut $ encode (Proxy @BinaryCodec) expected

@@ -34,7 +34,6 @@ import Data.Proxy
 import Language.Haskell.TH
 import Language.Haskell.TH.Datatype
 import Data.Char
-import Control.Monad.State
 import Control.Monad
 
 -- * Deriving 'HasInfo' and 'Serializable' with Template Haskell
@@ -99,9 +98,6 @@ deriveHasInfo codecName codecArgs typeName = do
     x ->
       error $ "Unsupported data type " ++ show typeName ++ ": " ++ show x
 
-(<<>>) :: (Applicative m, Monoid a) => m a -> m a -> m a
-a <<>> b = (<>) <$> a <*> b
-
 -- | Derive a 'Serializable' instance for the given codec and type.
 -- Currently only supports record types.
 -- The generated instance will serialize record fields in the order
@@ -131,10 +127,12 @@ deriveSerializable codecName codecArgs typeName = do
                   , varP (mkName "item")
                   ]
                   (normalB $
-                    foldr1 (\a b -> varE '(<<>>) `appE` a `appE` b)
-                      [ [| encode p ($(varE fieldName) item) |]
-                      | (fieldName, _, _) <- fields
-                      ]
+                    [| sequence_
+                        $(listE
+                            [ [| encode p ($(varE fieldName) item) |]
+                            | (fieldName, _, _) <- fields
+                            ])
+                     |]
                   )
                   []
               ]
