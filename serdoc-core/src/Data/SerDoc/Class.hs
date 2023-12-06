@@ -11,7 +11,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
@@ -20,16 +19,13 @@ where
 
 import Data.SerDoc.Info
 
+import Data.Kind
 import Data.List
 import Data.Map ( Map )
 import qualified Data.Map.Strict as Map
 import Data.Proxy
-import Data.Word
-import Data.Kind
 import Data.Typeable
-import Control.Monad.Except
-import Control.Monad.Identity
-import Data.Bifunctor
+import Data.Word
 
 -- * Typeclasses
 
@@ -39,21 +35,11 @@ import Data.Bifunctor
 -- 'Codec' typeclass itself only captures the associated types that are involved
 -- in serializing and deserializing.
 class Codec codec where
-  -- | Encoding / decoding context. This type can be used, for example, to pass
-  -- a network socket to the encoding and decoding functions.
-  type Context codec :: Type
-
-  -- | The 'Monad' in which encoding can happen. For pure codecs, use 'Identity'.
+  -- | The 'Monad' in which encoding can happen.
   type MonadEncode codec :: Type -> Type
 
-  -- | The 'Monad' in which decoding can happen. For pure codecs, use 'Identity'.
+  -- | The 'Monad' in which decoding can happen.
   type MonadDecode codec :: Type -> Type
-
-  -- | This type is used to return the result of encoding, and to pass encoded
-  -- data to a decoder.
-  -- For in-place encoders, use the 'Context' to pass the encoding context, and
-  -- use '()' for 'Encoded'.
-  type Encoded codec :: Type
 
   -- | Unless explicitly declared otherwise, enum fields will be encoded as
   -- this type.
@@ -63,76 +49,10 @@ class Codec codec where
 -- | Serialization and deserialization API for a 'Codec'.
 class Codec codec => Serializable codec a where
   -- | Encode / serialize a value.
-  encode :: Proxy codec -> Context codec -> a -> MonadEncode codec (Encoded codec)
-  -- | Decode / deserialize a value. Returns the decoded value, and any
-  -- remaining unconsumed input. Decoding errors can be signalled through the
-  -- codec's 'MonadDecode' type.
-  -- This is the most general decoding function; for some codecs, you may want
-  -- to use 'decode', 'decodeEither', or 'decodeMEither' instead.
-  decodeM :: Proxy codec -> Context codec -> Encoded codec -> MonadDecode codec (a, Encoded codec)
+  encode :: Proxy codec -> a -> MonadEncode codec ()
 
--- | Decode / deserialize a value, discarding unconsumed input.
-decodeM_ :: (Serializable codec a, Functor (MonadDecode codec))
-         => Proxy codec
-         -> Context codec
-         -> Encoded codec
-         -> MonadDecode codec a
-decodeM_ codec ctx = fmap fst . decodeM codec ctx
-
--- | Decode in a pure codec without error handling facilities.
-decode :: (Serializable codec a, MonadDecode codec ~ Identity)
-       => Proxy codec
-       -> Context codec
-       -> Encoded codec
-       -> (a, Encoded codec)
-decode codec ctx enc = runIdentity $ decodeM codec ctx enc
-
--- | Decode in a pure codec without error handling facilities, discarding
--- unconsumed input.
-decode_ :: (Serializable codec a, MonadDecode codec ~ Identity)
-       => Proxy codec
-       -> Context codec
-       -> Encoded codec
-       -> a
-decode_ codec ctx enc = runIdentity $ decodeM_ codec ctx enc
-
--- | Decode in a codec that uses 'ExceptT' for signalling decoding errors.
-decodeMEither :: (Serializable codec a, Functor m, MonadDecode codec ~ ExceptT err m)
-              => Proxy codec
-              -> Context codec
-              -> Encoded codec
-              -> m (Either err (a, Encoded codec))
-decodeMEither p c e =
-  runExceptT $ decodeM p c e
-
--- | Decode in a codec that uses 'ExceptT' for signalling decoding errors,
--- discarding unconsumed input.
-decodeMEither_ :: (Serializable codec a, Functor m, MonadDecode codec ~ ExceptT err m)
-              => Proxy codec
-              -> Context codec
-              -> Encoded codec
-              -> m (Either err a)
-decodeMEither_ p c e =
-  runExceptT $ decodeM_ p c e
-
--- | Decode in a pure codec with error signalling using 'Except'.
-decodeEither :: (Serializable codec a, MonadDecode codec ~ Except err)
-             => Proxy codec
-             -> Context codec
-             -> Encoded codec
-             -> Either err (a, Encoded codec)
-decodeEither p c e =
-  runExcept $ decodeM p c e
-
--- | Decode in a pure codec with error signalling using 'Except', discarding
--- unconsumed input.
-decodeEither_ :: (Serializable codec a, MonadDecode codec ~ Except err)
-             => Proxy codec
-             -> Context codec
-             -> Encoded codec
-             -> Either err a
-decodeEither_ p c e =
-  runExcept $ decodeM_ p c e
+  -- | Decode / deserialize a value.
+  decode :: Proxy codec -> MonadDecode codec a
 
 -- | Serialization metadata for a 'Codec'.
 class Codec codec => HasInfo codec a where
@@ -166,8 +86,8 @@ instance ( Enum a
          , Serializable codec (DefEnumEncoding codec)
          ) => Serializable codec (ViaEnum a)
   where
-    encode pCodec context (ViaEnum x) = encodeEnum pCodec (Proxy @(DefEnumEncoding codec)) context x
-    decodeM pCodec context encoded = first ViaEnum <$> decodeEnumM pCodec (Proxy @(DefEnumEncoding codec)) context encoded
+    encode pCodec (ViaEnum x) = encodeEnum pCodec (Proxy @(DefEnumEncoding codec)) x
+    decode pCodec = ViaEnum <$> decodeEnum pCodec (Proxy @(DefEnumEncoding codec))
 
 enumInfo :: forall codec a n.
             ( Typeable a
@@ -197,14 +117,13 @@ encodeEnum :: forall codec n a.
               )
            => Proxy codec
            -> Proxy n
-           -> Context codec
            -> a
-           -> MonadEncode codec (Encoded codec)
-encodeEnum pCodec _ context x = do
+           -> MonadEncode codec ()
+encodeEnum pCodec _ x = do
   let i :: n = fromIntegral . fromEnum $ x
-  encode pCodec context i
+  encode pCodec i
 
-decodeEnumM :: forall codec n a.
+decodeEnum :: forall codec n a.
                ( Enum a
                , Bounded a
                , Codec codec
@@ -214,12 +133,10 @@ decodeEnumM :: forall codec n a.
                )
             => Proxy codec
             -> Proxy n
-            -> Context codec
-            -> Encoded codec
-            -> (MonadDecode codec) (a, Encoded codec)
-decodeEnumM pCodec _ context enc = do
-  (i :: n, rest) <- decodeM pCodec context enc
-  return (toEnum . fromIntegral $ i, rest)
+            -> (MonadDecode codec) a
+decodeEnum pCodec _ = do
+  (i :: n) <- decode pCodec
+  return (toEnum . fromIntegral $ i)
 
 getTypeName :: Typeable a => Proxy a -> String
 getTypeName = tyConName . typeRepTyCon . typeRep

@@ -128,32 +128,27 @@ deriveSerializable codecName codecArgs typeName = do
               (mkName "encode")
               [ clause
                   [ varP (mkName "p")
-                  , varP (mkName "ctx")
                   , varP (mkName "item")
                   ]
                   (normalB $
                     foldr1 (\a b -> varE '(<<>>) `appE` a `appE` b)
-                      [ [| encode p ctx ($(varE fieldName) item) |]
+                      [ [| encode p ($(varE fieldName) item) |]
                       | (fieldName, _, _) <- fields
                       ]
                   )
                   []
               ]
           , funD
-              (mkName "decodeM")
+              (mkName "decode")
               [ clause
                   [ varP (mkName "p")
-                  , varP (mkName "ctx")
                   ]
                   (normalB $
-                      [| runStateT
-                            (
-                              $(foldApplicative
-                                  (conE conName)
-                                  [ [| StateT $ decodeM p ctx |] | _ <- fields ]
-                               )
-                            )
-                        |]
+                      [| $(foldApplicative
+                              (conE conName)
+                              [ [| decode p |] | _ <- fields ]
+                           )
+                       |]
                   )
                   []
               ]

@@ -1,43 +1,40 @@
-{-# LANGUAGE TypeFamilies #-} {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Data.SerDoc.Binary.Codec
 where
 
-import Data.SerDoc.Class
+import Data.SerDoc.Class as SerDoc
 import Data.SerDoc.Info
 
 import qualified Data.Binary as B
 import qualified Data.Binary.Put as B
-import Data.Word
-import Data.Int
-import Numeric.Natural
-import Data.Proxy
-import Data.List
 import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy as LBS
 import Data.ByteString.Short (ShortByteString)
-import Data.Bifunctor
+import Data.Int
+import Data.List
+import Data.Proxy
+import Data.Word
+import Numeric.Natural
 
 data BinaryCodec
 
 instance Codec BinaryCodec where
-  type Context BinaryCodec = ()
-  type Encoded BinaryCodec = ()
   type MonadEncode BinaryCodec = B.PutM
   type MonadDecode BinaryCodec = B.Get
 
 newtype ViaBinary a = ViaBinary { viaBinary :: a }
 
 instance B.Binary a => Serializable BinaryCodec (ViaBinary a) where
-  encode _ () = B.put . viaBinary
-  decodeM _ _ () = first ViaBinary <$> B.get
+  encode _ = B.put . viaBinary
+  decode _ = ViaBinary <$> B.get
 
 instance HasInfo BinaryCodec () where
   info _ _ = basicField "()" (FixedSize 0)

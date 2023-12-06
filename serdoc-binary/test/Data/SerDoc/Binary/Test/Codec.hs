@@ -166,8 +166,8 @@ pRoundTrip expected =
       counterexample ("Parsed value: " ++ show actual) $
         property False
   where
-    encoded = runPut $ encode (Proxy @BinaryCodec) () expected
-    getResult = runGetOrFail (fst <$> decodeM (Proxy @BinaryCodec) () ()) encoded
+    encoded = runPut $ encode (Proxy @BinaryCodec) expected
+    getResult = runGetOrFail (decode (Proxy @BinaryCodec)) encoded
 
 pBinaryMatchesCodec :: forall a.
                        ( Serializable BinaryCodec a
@@ -180,7 +180,7 @@ pBinaryMatchesCodec :: forall a.
 pBinaryMatchesCodec value =
   encoded === encodedBinary
   where
-    encoded = runPut $ encode (Proxy @BinaryCodec) () value
+    encoded = runPut $ encode (Proxy @BinaryCodec) value
     encodedBinary = runPut $ put value
 
 pEncodedSizeMatches :: forall a.
@@ -213,7 +213,7 @@ pEncodedSizeMatches value =
       label (show s) $
         property True
   where
-    encoded = runPut $ encode (Proxy @BinaryCodec) () value
+    encoded = runPut $ encode (Proxy @BinaryCodec) value
     encodedSize = fromIntegral $ LBS.length encoded
     fi = info (Proxy @BinaryCodec) (Proxy @a)
     infoSizeExpr = fieldSize fi

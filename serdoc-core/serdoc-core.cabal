@@ -24,7 +24,7 @@ library
                    , Data.SerDoc.Info
                    , Data.SerDoc.TestUtil
                    , Data.SerDoc.TH
-    build-depends: base ^>=4.16.0.0
+    build-depends: base >=4.16.0.0 && <5
                  , bytestring >=0.11 && <0.13
                  , containers >=0.6 && <0.8
                  , mtl >=2.3.1 && <2.4
@@ -46,7 +46,7 @@ test-suite serdoc-test
     type:             exitcode-stdio-1.0
     hs-source-dirs:   test
     main-is:          Main.hs
-    build-depends: base ^>=4.16.0.0
+    build-depends: base >=4.16.0.0 && <5
                  , serdoc-core
                  , bytestring >=0.11 && <0.13
                  , mtl >=2.3.1 && <2.4
