@@ -51,6 +51,17 @@ strippedFieldName tyName fieldName =
     else
       fieldStr
 
+nameToTy :: Name -> Type
+nameToTy name = case nameBase name of
+  "" -> error "Empty names are not allowed"
+  c:_ | isLower c -> VarT name
+  c:_ | isUpper c -> ConT name
+  _ -> error $ "Unsupported name: " ++ show name
+
+tyVarBndrName :: TyVarBndr a -> Name
+tyVarBndrName (PlainTV name _) = name
+tyVarBndrName (KindedTV name _ _) = name
+
 -- | Derive a 'HasInfo' instance for the given codec and type.
 -- Currently only supports record types.
 -- A matching 'Serializable' instance must serialize record fields in the order
@@ -59,7 +70,9 @@ strippedFieldName tyName fieldName =
 -- these requirements, you must write a custom 'HasInfo' instance instead.
 deriveHasInfo :: Name -> [Name] -> Name -> DecsQ
 deriveHasInfo codecName codecArgs typeName = do
-  let codecTy = foldl AppT (ConT codecName) [ ConT n | n <- codecArgs ]
+  TyConI (DataD _ _ codecVars _ _ _) <- reify codecName
+  let remainingVars = drop (length codecArgs) codecVars
+  let codecTy = foldl AppT (ConT codecName) (map nameToTy (codecArgs ++ map tyVarBndrName remainingVars))
   reify typeName >>= \case
     TyConI (DataD [] tyName tyVars Nothing [RecC _ fields] []) -> do
       let constraintFields = filter (\(_, _, fieldTy) -> not . null . freeVariables $ fieldTy) fields
@@ -106,13 +119,28 @@ deriveHasInfo codecName codecArgs typeName = do
 -- 'deriveHasInfo'. (See also 'deriveSerDoc'.)
 deriveSerializable :: Name -> [Name] -> Name -> DecsQ
 deriveSerializable codecName codecArgs typeName = do
-  let codecTy = foldl AppT (ConT codecName) [ ConT n | n <- codecArgs ]
+  TyConI (DataD _ _ codecVars _ _ _) <- reify codecName
+  let remainingVars = drop (length codecArgs) codecVars
+  let codecTy = foldl AppT (ConT codecName) (map nameToTy (codecArgs ++ map tyVarBndrName remainingVars))
   reify typeName >>= \case
     TyConI (DataD [] tyName tyVars Nothing [RecC conName fields] []) -> do
-      let constraintFields = filter (\(_, _, fieldTy) -> not . null . freeVariables $ fieldTy) fields
-      constraints <- forM constraintFields $
+      let constraintFields =
+            if null remainingVars then
+              filter (\(_, _, fieldTy) -> not . null . freeVariables $ fieldTy) fields
+            else
+              fields
+      constraints1 <-
+            if null remainingVars then
+              pure []
+            else
+              sequence
+                [ [t| Monad (MonadEncode $(pure codecTy)) |]
+                , [t| Monad (MonadDecode $(pure codecTy)) |]
+                ]
+      constraints2 <- forM constraintFields $
           \(_, _, fieldTy) ->
               [t| Serializable $(pure codecTy) $(pure fieldTy) |]
+      let constraints = constraints1 ++ constraints2
       fmap (:[]) $
         instanceD
           (pure constraints) 

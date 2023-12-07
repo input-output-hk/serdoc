@@ -22,27 +22,28 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Control.Monad.Writer
 import Control.Monad.State
+import Data.Kind
 
 import Data.SerDoc.Class
 import Data.SerDoc.Info
 import Data.SerDoc.TH
 import Data.SerDoc.TestUtil
 
-data ShowCodec
+data ShowCodec (m :: Type -> Type)
 
-instance Codec ShowCodec where
-  type MonadEncode ShowCodec = Writer ByteString
-  type MonadDecode ShowCodec = ExceptT String (State ByteString)
+instance Codec (ShowCodec m) where
+  type MonadEncode (ShowCodec m) = Writer ByteString
+  type MonadDecode (ShowCodec m) = ExceptT String (State ByteString)
 
-instance HasInfo ShowCodec () where
+instance HasInfo (ShowCodec m) () where
   info _ _ = basicField "()" (FixedSize $ BS.length $ showBS ())
 
-instance HasInfo ShowCodec Int where
+instance HasInfo (ShowCodec m) Int where
   info _ _ = basicField "Int" (RangeSize (FixedSize 1) (FixedSize $ length $ show (minBound :: Int)))
 
 newtype ViaShow a = ViaShow { viaShow :: a }
 
-instance (Show a, Read a) => Serializable ShowCodec (ViaShow a) where
+instance (Show a, Read a) => Serializable (ShowCodec m) (ViaShow a) where
   encode _ = tell . showBS . viaShow
   decode _ = do
     decodedMay <- readMaybeBS <$> get
@@ -53,9 +54,9 @@ instance (Show a, Read a) => Serializable ShowCodec (ViaShow a) where
         put rest
         return (ViaShow x)
 
-deriving via (ViaShow ()) instance Serializable ShowCodec ()
+deriving via (ViaShow ()) instance Serializable (ShowCodec m) ()
 
-deriving via (ViaShow Int) instance Serializable ShowCodec Int
+deriving via (ViaShow Int) instance Serializable (ShowCodec m) Int
 
 
 data Record =
@@ -90,14 +91,14 @@ $(deriveSerDoc ''ShowCodec [] ''Record1)
 
 tests :: TestTree
 tests = testGroup "Class"
-          [ testGroup "ShowCodec"
+          [ testGroup "ShowCodec m"
               [ testGroup "HasInfo"
-                  [ testProperty "()" $ pUnitHasInfo (Proxy @ShowCodec)
+                  [ testProperty "()" $ pUnitHasInfo (Proxy @(ShowCodec IO))
                   ]
               , testGroup "Serializable"
-                  [ testProperty "()" $ pRoundTrip @() (Proxy @ShowCodec) execWriter (runState . runExceptT)
-                  -- , testProperty "Int" $ pRoundTrip @Int (Proxy @ShowCodec) execWriter runState
-                  -- , testProperty "Record" $ pRoundTrip @Record (Proxy @ShowCodec) execWriter runState
+                  [ testProperty "()" $ pRoundTrip @() (Proxy @(ShowCodec IO)) execWriter (runState . runExceptT)
+                  -- , testProperty "Int" $ pRoundTrip @Int (Proxy @(ShowCodec IO)) execWriter runState
+                  -- , testProperty "Record" $ pRoundTrip @Record (Proxy @(ShowCodec IO)) execWriter runState
                   ]
               ]
           ]
