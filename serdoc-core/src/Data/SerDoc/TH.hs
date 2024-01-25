@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -58,9 +59,15 @@ nameToTy name = case nameBase name of
   c:_ | isUpper c -> ConT name
   _ -> error $ "Unsupported name: " ++ show name
 
+#if MIN_VERSION_template_haskell(2,17,0)
 tyVarBndrName :: TyVarBndr a -> Name
 tyVarBndrName (PlainTV name _) = name
 tyVarBndrName (KindedTV name _ _) = name
+#else
+tyVarBndrName :: TyVarBndr -> Name
+tyVarBndrName (PlainTV name ) = name
+tyVarBndrName (KindedTV name _) = name
+#endif
 
 -- | Derive a 'HasInfo' instance for the given codec and type.
 -- Currently only supports record types.
@@ -197,6 +204,12 @@ foldApplicative initial [x] = [| $initial <$> $x |]
 foldApplicative initial (x:xs) =
   foldl (\a b -> [| $a <*> $b |]) [| $initial <$> $x |] xs
 
+#if MIN_VERSION_template_haskell(2,17,0)
 tyVarName :: TyVarBndr a -> Name
 tyVarName (PlainTV n _) = n
 tyVarName (KindedTV n _ _) = n
+#else
+tyVarName :: TyVarBndr -> Name
+tyVarName (PlainTV n) = n
+tyVarName (KindedTV n _) = n
+#endif

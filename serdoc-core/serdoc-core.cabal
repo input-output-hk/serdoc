@@ -30,7 +30,7 @@ library
                    , Data.SerDoc.Info
                    , Data.SerDoc.TestUtil
                    , Data.SerDoc.TH
-    build-depends: base >=4.16.0.0 && <5
+    build-depends: base >=4.14.0.0 && <5
                  , bytestring >=0.11 && <0.13
                  , containers >=0.6 && <0.8
                  , mtl >=2.3.1 && <2.4
@@ -38,7 +38,7 @@ library
                  , tasty-quickcheck >=0.10.3 && <0.11
                  , text >=1.1 && <2.2
                  , time >=1.12 && <1.14
-                 , template-haskell >=2.18 && <2.20
+                 , template-haskell >=2.16 && <2.22
                  , th-abstraction >=0.6 && <0.7
     hs-source-dirs:   src
     default-language: Haskell2010
@@ -53,12 +53,12 @@ test-suite serdoc-test
     type:             exitcode-stdio-1.0
     hs-source-dirs:   test
     main-is:          Main.hs
-    build-depends: base >=4.16.0.0 && <5
+    build-depends: base >=4.14.0.0 && <5
                  , serdoc-core
                  , bytestring >=0.11 && <0.13
                  , mtl >=2.3.1 && <2.4
                  , tasty >=1.5 && <1.6
                  , tasty-quickcheck >=0.10.3 && <0.11
-                 , template-haskell >=2.18 && <2.20
+                 , template-haskell >=2.16 && <2.22
                  , text >=1.1 && <2.2
                  , time >=1.12 && <1.14
