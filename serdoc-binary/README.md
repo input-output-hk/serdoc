@@ -23,6 +23,4 @@ Components
 SerDoc is split up into two sub-projects:
 
 - `serdoc-core`, which provides the typeclasses and building blocks
-- `serdoc-binary`, which provides instances for `binary`
-
-See their individual README.md files for details.
+- `serdoc-binary` (this library), which provides instances for `binary`

@@ -10,7 +10,8 @@ maintainer:         tobias@well-typed.com
 copyright:          2023 IO Global
 category:           Data
 build-type:         Simple
--- extra-doc-files:
+extra-doc-files:    README.md
+               ,    CHANGELOG.md
 -- extra-source-files:
 
 common warnings
