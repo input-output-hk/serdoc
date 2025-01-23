@@ -1,6 +1,6 @@
 cabal-version:      3.0
 name:               serdoc-binary
-version:            0.2.0.0
+version:            0.3.0.0
 synopsis:           `binary` backend for `serdoc`
 -- description:
 license:            Apache-2.0
@@ -24,7 +24,7 @@ library
     -- other-modules:
     -- other-extensions:
     build-depends: base >=4.14.0.0 && <5
-                 , serdoc-core ^>=0.1.0.0
+                 , serdoc-core ^>=0.3.0.0
                  , binary >=0.8.0.0 && <0.11
                  , bytestring >=0.11 && <0.13
     hs-source-dirs:   src
@@ -39,7 +39,7 @@ test-suite serdoc-binary-test
     other-modules: Data.SerDoc.Binary.Test.Codec
     build-depends: base >=4.14.0.0 && <5
                  , serdoc-binary
-                 , serdoc-core ^>=0.1.0.0
+                 , serdoc-core ^>=0.3.0.0
                  , binary >=0.8.0.0 && <0.11
                  , bytestring >=0.11 && <0.13
                  , mtl >=2.3.1 && <2.4
