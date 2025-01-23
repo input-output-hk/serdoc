@@ -1,6 +1,6 @@
 cabal-version:      3.0
 name:               serdoc-binary
-version:            0.1.0.0
+version:            0.2.0.0
 synopsis:           `binary` backend for `serdoc`
 -- description:
 license:            Apache-2.0
