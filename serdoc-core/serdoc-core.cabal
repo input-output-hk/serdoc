@@ -1,6 +1,6 @@
 cabal-version:      3.0
 name:               serdoc-core
-version:            0.3.0.0
+version:            0.3.1.0
 synopsis:           Generated documentation of serialization formats
 description:        A set of typeclasses, primitives, combinators, and TH
                     utilities for documenting serialization formats in a mostly
