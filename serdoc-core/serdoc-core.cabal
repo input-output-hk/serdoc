@@ -40,7 +40,7 @@ library
                  , text >=1.1 && <2.2
                  , time >=1.12 && <1.14
                  , template-haskell >=2.16 && <2.24
-                 , th-abstraction >=0.6 && <0.7
+                 , th-abstraction >=0.6 && <0.8
     hs-source-dirs:   src
     default-language: Haskell2010
 
