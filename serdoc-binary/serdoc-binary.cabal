@@ -43,4 +43,4 @@ test-suite serdoc-binary-test
                  , binary >=0.8.0.0 && <0.11
                  , bytestring >=0.11 && <0.13
                  , tasty >=1.5 && <1.6
-                 , tasty-quickcheck >=0.10.3 && <0.11
+                 , tasty-quickcheck >=0.10.3 && <0.12
